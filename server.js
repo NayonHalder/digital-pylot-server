@@ -15,6 +15,11 @@ const dashboardRoutes = require('./routes/dashboardRoutes');
 const authRoutes = require('./routes/authRoutes');
 const userRoutes = require('./routes/userRoutes');
 const auditRoutes = require('./routes/auditRoutes');
+const leadRoutes = require('./routes/leadRoutes');
+const taskRoutes = require('./routes/taskRoutes');
+const reportRoutes = require('./routes/reportRoutes');
+const customerRoutes = require('./routes/customerRoutes');
+const settingsRoutes = require('./routes/settingsRoutes');
 const cookieParser = require('cookie-parser');
 const { cleanupBlacklist } = require('./utils/tokenBlacklist');
 
@@ -47,6 +52,11 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/audit-logs', auditRoutes);
+app.use('/api/leads', leadRoutes);
+app.use('/api/tasks', taskRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/customer', customerRoutes);
+app.use('/api/settings', settingsRoutes);
 
 // Root route
 app.get('/', (req, res) => {
