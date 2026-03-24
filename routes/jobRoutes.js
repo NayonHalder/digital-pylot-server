@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { protect, requirePermission } = require('../middleware/authMiddleware');
 const {
   getJobs,
   getJob,
@@ -10,13 +11,13 @@ const {
 
 router
   .route('/')
-  .get(getJobs)
-  .post(createJob);
+  .get(protect, requirePermission('view_jobs'), getJobs)
+  .post(protect, requirePermission('manage_jobs'), createJob);
 
 router
   .route('/:id')
-  .get(getJob)
-  .put(updateJob)
-  .delete(deleteJob);
+  .get(protect, requirePermission('view_jobs'), getJob)
+  .put(protect, requirePermission('manage_jobs'), updateJob)
+  .delete(protect, requirePermission('manage_jobs'), deleteJob);
 
 module.exports = router;

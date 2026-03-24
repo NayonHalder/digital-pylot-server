@@ -2,6 +2,7 @@ const User = require('../models/User');
 const AuditLog = require('../models/AuditLog');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
+const { blacklistToken, isBlacklisted } = require('../utils/tokenBlacklist');
 
 const generateAccessToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET || 'secret', {
@@ -65,8 +66,7 @@ const loginUser = async (req, res) => {
         email: user.email,
         role: user.role,
         permissions: user.permissions,
-        accessToken: accessToken, 
-        refreshToken: refreshToken, 
+        accessToken: accessToken,
       });
     } else {
       res.status(401).json({ message: 'Invalid email or password' });
@@ -137,13 +137,16 @@ const registerUser = async (req, res) => {
 // @access  Public
 const refreshToken = async (req, res) => {
   const cookies = req.cookies;
-  const bodyToken = req.body?.refresh_token;
-
-  const rToken = bodyToken || cookies?.refreshToken;
+  const rToken = cookies?.refreshToken;
 
   if (!rToken) return res.status(401).json({ message: 'Unauthorized' });
 
   try {
+    const blacklisted = await isBlacklisted(rToken);
+    if (blacklisted) {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+
     const user = await User.findOne({ refreshToken: rToken });
     if (!user) return res.status(403).json({ message: 'Forbidden' });
 
@@ -154,6 +157,11 @@ const refreshToken = async (req, res) => {
         if (err || user._id.toString() !== decoded.id) {
           return res.status(403).json({ message: 'Forbidden' });
         }
+
+        if (user.status === 'suspended' || user.status === 'banned' || user.status === 'pending') {
+          return res.status(403).json({ message: 'Account is not active' });
+        }
+
         const accessToken = generateAccessToken(user._id);
         const expires_at = Date.now() + 15 * 60 * 1000;
         
@@ -176,9 +184,12 @@ const refreshToken = async (req, res) => {
 const logoutUser = async (req, res) => {
   const cookies = req.cookies;
   const rToken = cookies?.refreshToken;
+  const authorization = req.headers.authorization || '';
+  const accessToken = authorization.startsWith('Bearer ') ? authorization.split(' ')[1] : null;
 
   if (rToken) {
     try {
+      await blacklistToken(rToken, 'refresh');
       const user = await User.findOne({ refreshToken: rToken });
       if (user) {
         user.refreshToken = '';
@@ -189,8 +200,15 @@ const logoutUser = async (req, res) => {
     }
   }
 
+  if (accessToken) {
+    try {
+      await blacklistToken(accessToken, 'access');
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
   res.clearCookie('refreshToken', { httpOnly: true, sameSite: 'strict', secure: process.env.NODE_ENV === 'production' });
-  res.clearCookie('accessToken', { httpOnly: true, sameSite: 'strict', secure: process.env.NODE_ENV === 'production' });
   res.status(200).json({ message: 'Logged out successfully' });
 };
 

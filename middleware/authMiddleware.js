@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { isBlacklisted } = require('../utils/tokenBlacklist');
 
 const protect = async (req, res, next) => {
   let token;
@@ -8,13 +9,26 @@ const protect = async (req, res, next) => {
     try {
       token = req.headers.authorization.split(' ')[1];
 
+      const blacklisted = await isBlacklisted(token);
+      if (blacklisted) {
+        return res.status(401).json({ message: 'Not authorized, token revoked' });
+      }
+
       // Decode token
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
       
       req.user = await User.findById(decoded.id).select('-password');
 
-      if (!req.user || req.user.status !== 'active') {
-        return res.status(401).json({ message: 'Not authorized, account suspended' });
+      if (!req.user) {
+        return res.status(401).json({ message: 'Not authorized, user missing' });
+      }
+
+      if (req.user.status === 'suspended' || req.user.status === 'banned') {
+        return res.status(403).json({ message: 'Account is suspended or banned' });
+      }
+
+      if (req.user.status !== 'active') {
+        return res.status(401).json({ message: 'Not authorized, account inactive' });
       }
 
       next();
