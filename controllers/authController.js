@@ -25,8 +25,10 @@ const loginUser = async (req, res) => {
     const user = await User.findOne({ email });
 
     if (user && (await bcrypt.compare(password, user.password))) {
+      // Robust status check
+      const status = (user.status || '').toString().trim().toLowerCase();
       
-      if (user.status !== 'active') {
+      if (status !== 'active') {
         return res.status(403).json({ message: 'Account is suspended or banned' });
       }
 
