@@ -20,7 +20,7 @@ const generateRefreshToken = (id) => {
 // @route   POST /api/auth/login
 // @access  Public
 const loginUser = async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, rememberMe } = req.body;
 
   try {
     const user = await User.findOne({ email });
@@ -59,6 +59,18 @@ const loginUser = async (req, res) => {
         sameSite: 'strict',
         maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
       });
+
+      const contextCookieOptions = {
+        httpOnly: false,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'strict',
+        maxAge: rememberMe ? 7 * 24 * 60 * 60 * 1000 : undefined,
+      };
+
+      res.cookie('userRole', user.role, contextCookieOptions);
+      res.cookie('userEmail', user.email, contextCookieOptions);
+      res.cookie('userName', user.name, contextCookieOptions);
+      res.cookie('userPermissions', JSON.stringify(user.permissions || []), contextCookieOptions);
 
       res.json({
         _id: user.id,
@@ -209,6 +221,10 @@ const logoutUser = async (req, res) => {
   }
 
   res.clearCookie('refreshToken', { httpOnly: true, sameSite: 'strict', secure: process.env.NODE_ENV === 'production' });
+  res.clearCookie('userRole', { sameSite: 'strict', secure: process.env.NODE_ENV === 'production' });
+  res.clearCookie('userEmail', { sameSite: 'strict', secure: process.env.NODE_ENV === 'production' });
+  res.clearCookie('userName', { sameSite: 'strict', secure: process.env.NODE_ENV === 'production' });
+  res.clearCookie('userPermissions', { sameSite: 'strict', secure: process.env.NODE_ENV === 'production' });
   res.status(200).json({ message: 'Logged out successfully' });
 };
 
