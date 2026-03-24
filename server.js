@@ -30,6 +30,8 @@ connectDB();
 
 const app = express();
 
+app.set('trust proxy', 1);
+
 // Body parser
 app.use(express.json());
 
@@ -37,7 +39,10 @@ app.use(express.json());
 app.use(cookieParser());
 
 // Enable CORS
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:3001,https://digital-pylot-frontend-five.vercel.app').split(',');
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:3000,http://localhost:3001,https://digital-pylot-frontend-five.vercel.app')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -47,7 +52,9 @@ app.use(cors({
       callback(new Error('CORS not allowed for this origin'));
     }
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 // Dev logging middleware

@@ -16,6 +16,31 @@ const generateRefreshToken = (id) => {
   });
 };
 
+const isProduction = process.env.NODE_ENV === 'production';
+
+const buildCookieOptions = ({ httpOnly, maxAge }) => {
+  const options = {
+    httpOnly,
+    secure: isProduction,
+    sameSite: isProduction ? 'none' : 'lax',
+    path: '/',
+  };
+
+  if (typeof maxAge === 'number') {
+    options.maxAge = maxAge;
+  }
+
+  if (process.env.COOKIE_DOMAIN) {
+    options.domain = process.env.COOKIE_DOMAIN;
+  }
+
+  if (isProduction) {
+    options.partitioned = true;
+  }
+
+  return options;
+};
+
 // @desc    Auth user & get token
 // @route   POST /api/auth/login
 // @access  Public
@@ -53,19 +78,17 @@ const loginUser = async (req, res) => {
       });
 
       // Send refresh token in httpOnly cookie
-      res.cookie('refreshToken', refreshToken, {
+      const refreshCookieOptions = buildCookieOptions({
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+        maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
-      const contextCookieOptions = {
+      const contextCookieOptions = buildCookieOptions({
         httpOnly: false,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
         maxAge: rememberMe ? 7 * 24 * 60 * 60 * 1000 : undefined,
-      };
+      });
+
+      res.cookie('refreshToken', refreshToken, refreshCookieOptions);
 
 
       res.cookie('userRole', user.role, contextCookieOptions);
@@ -223,22 +246,14 @@ const logoutUser = async (req, res) => {
     }
   }
 
-  const cookieOptions = {
-    httpOnly: true,
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    secure: process.env.NODE_ENV === 'production'
-  };
+  const refreshCookieOptions = buildCookieOptions({ httpOnly: true });
+  const contextCookieOptions = buildCookieOptions({ httpOnly: false });
 
-  const publicCookieOptions = {
-    ...cookieOptions,
-    httpOnly: false
-  };
-
-  res.clearCookie('refreshToken', cookieOptions);
-  res.clearCookie('userRole', publicCookieOptions);
-  res.clearCookie('userEmail', publicCookieOptions);
-  res.clearCookie('userName', publicCookieOptions);
-  res.clearCookie('userPermissions', publicCookieOptions);
+  res.clearCookie('refreshToken', refreshCookieOptions);
+  res.clearCookie('userRole', contextCookieOptions);
+  res.clearCookie('userEmail', contextCookieOptions);
+  res.clearCookie('userName', contextCookieOptions);
+  res.clearCookie('userPermissions', contextCookieOptions);
 
   res.status(200).json({ message: 'Logged out successfully' });
 };
